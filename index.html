@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Snake - Game Pendidikan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+
+        body {
+            font-family: 'Fredoka', sans-serif;
+            touch-action: none; /* Mencegah scroll saat main di HP */
+            background-color: #1a202c; /* Slate 900 */
+            color: white;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        canvas {
+            background-color: #2d3748; /* Slate 800 */
+            border-radius: 8px;
+            display: block;
+        }
+
+        .overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 8px;
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Styling untuk tombol kontrol HP */
+        .d-pad {
+            display: grid;
+            grid-template-columns: 60px 60px 60px;
+            grid-template-rows: 60px 60px;
+            gap: 5px;
+            margin-top: 15px;
+        }
+        
+        .d-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            color: white;
+            font-size: 24px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .d-btn:active {
+            background: rgba(255, 255, 255, 0.5);
+        }
+
+        .d-up { grid-column: 2; grid-row: 1; }
+        .d-left { grid-column: 1; grid-row: 2; }
+        .d-down { grid-column: 2; grid-row: 2; }
+        .d-right { grid-column: 3; grid-row: 2; }
+
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col items-center justify-center p-2">
+
+    <!-- Header & Score -->
+    <div class="w-full max-w-md flex justify-between items-center mb-2 px-2">
+        <div>
+            <h1 class="text-xl text-yellow-400 font-bold">Math Snake 🐍</h1>
+            <p class="text-xs text-gray-400">Makan jawaban yang benar!</p>
+        </div>
+        <div class="text-right">
+            <div class="text-2xl font-bold text-green-400" id="score-display">0</div>
+            <div class="text-xs text-gray-400">Skor Tertinggi: <span id="high-score">0</span></div>
+        </div>
+    </div>
+
+    <!-- Soal Matematika -->
+    <div id="question-box" class="w-full max-w-md bg-blue-600 rounded-lg p-2 mb-2 text-center shadow-lg transform transition-all duration-200">
+        <span class="text-lg font-bold text-white">Soal: </span>
+        <span id="question-text" class="text-2xl font-bold text-yellow-300 ml-2">...</span>
+    </div>
+
+    <!-- Area Game -->
+    <div id="game-wrapper" class="relative">
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+        <!-- Start Screen -->
+        <div id="start-screen" class="overlay">
+            <h2 class="text-4xl font-bold text-green-400 mb-4">Math Snake</h2>
+            <p class="text-gray-300 mb-6 text-center px-4">Gunakan Panah atau Tombol Layar.<br>Makan angka jawaban yang benar!</p>
+            <button onclick="startGame()" class="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold rounded-full shadow-lg transition transform hover:scale-105">
+                Mulai Main
+            </button>
+        </div>
+
+        <!-- Game Over Screen -->
+        <div id="game-over-screen" class="overlay hidden">
+            <h2 class="text-4xl font-bold text-red-500 mb-2">Game Over!</h2>
+            <p class="text-xl text-white mb-4">Skor Kamu: <span id="final-score">0</span></p>
+            <button onclick="startGame()" class="px-8 py-3 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-full shadow-lg transition transform hover:scale-105">
+                Coba Lagi
+            </button>
+        </div>
+    </div>
+
+    <!-- Kontrol HP (D-Pad) -->
+    <div class="d-pad md:hidden" id="mobile-controls">
+        <div class="d-btn d-up" ontouchstart="handleMobileInput('up', event)">▲</div>
+        <div class="d-btn d-left" ontouchstart="handleMobileInput('left', event)">◀</div>
+        <div class="d-btn d-down" ontouchstart="handleMobileInput('down', event)">▼</div>
+        <div class="d-btn d-right" ontouchstart="handleMobileInput('right', event)">▶</div>
+    </div>
+
+    <div class="hidden md:block mt-4 text-gray-500 text-sm">
+        Gunakan tombol panah keyboard untuk bergerak.
+    </div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Konfigurasi Grid
+    const gridSize = 20; 
+    let tileCount = 20; // 20x20 grid = 400x400 canvas
+    
+    // Variabel Game
+    let score = 0;
+    let highScore = localStorage.getItem('mathSnakeHighScore') || 0;
+    document.getElementById('high-score').innerText = highScore;
+
+    let snake = [];
+    let velocity = { x: 0, y: 0 };
+    let foodItems = []; // Array of objects {x, y, value, isCorrect}
+    let currentQuestion = {};
+    let gameLoop;
+    let isGameRunning = false;
+    let speed = 150; // ms per frame (makin kecil makin cepat)
+
+    // Resize Canvas agar responsif
+    function resizeCanvas() {
+        const maxWidth = Math.min(window.innerWidth - 32, 400); // Max 400px or screen width - padding
+        const scale = maxWidth / 400;
+        
+        // CSS scaling instead of changing canvas attributes to keep grid logic simple
+        canvas.style.width = `${maxWidth}px`;
+        canvas.style.height = `${maxWidth}px`;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // --- LOGIKA MATEMATIKA ---
+    function generateQuestion() {
+        const ops = ['+', '-', '*'];
+        const op = ops[Math.floor(Math.random() * ops.length)];
+        let a, b, ans;
+
+        // Buat soal yang angkanya masuk akal (1-99)
+        if (op === '+') {
+            a = Math.floor(Math.random() * 20) + 1;
+            b = Math.floor(Math.random() * 20) + 1;
+            ans = a + b;
+        } else if (op === '-') {
+            a = Math.floor(Math.random() * 20) + 5;
+            b = Math.floor(Math.random() * a); // Hasil positif
+            ans = a - b;
+        } else if (op === '*') {
+            a = Math.floor(Math.random() * 9) + 2;
+            b = Math.floor(Math.random() * 9) + 2;
+            ans = a * b;
+        }
+
+        currentQuestion = { text: `${a} ${op} ${b} = ?`, answer: ans };
+        document.getElementById('question-text').innerText = currentQuestion.text;
+        spawnFood(ans);
+    }
+
+    function spawnFood(correctAnswer) {
+        foodItems = [];
+        
+        // 1. Jawaban Benar
+        let correctPos = getRandomEmptyPosition();
+        foodItems.push({ ...correctPos, value: correctAnswer, isCorrect: true, color: '#48bb78' }); // Green
+
+        // 2. Jawaban Salah (Distractor 1)
+        let wrong1 = correctAnswer + Math.floor(Math.random() * 5) + 1;
+        let wrongPos1 = getRandomEmptyPosition();
+        foodItems.push({ ...wrongPos1, value: wrong1, isCorrect: false, color: '#f56565' }); // Red
+
+        // 3. Jawaban Salah (Distractor 2) - kadang muncul
+        if (Math.random() > 0.3) {
+            let wrong2 = Math.abs(correctAnswer - (Math.floor(Math.random() * 5) + 1));
+            let wrongPos2 = getRandomEmptyPosition();
+            foodItems.push({ ...wrongPos2, value: wrong2, isCorrect: false, color: '#f56565' });
+        }
+    }
+
+    function getRandomEmptyPosition() {
+        let pos;
+        let isSafe = false;
+        while (!isSafe) {
+            pos = {
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount)
+            };
+            
+            // Cek tabrakan dengan ular
+            let onSnake = snake.some(s => s.x === pos.x && s.y === pos.y);
+            // Cek tabrakan dengan makanan lain yg sudah ada
+            let onFood = foodItems.some(f => f.x === pos.x && f.y === pos.y);
+            
+            // Jangan spawn terlalu dekat dengan kepala ular
+            let distHead = Math.abs(pos.x - snake[0].x) + Math.abs(pos.y - snake[0].y);
+
+            if (!onSnake && !onFood && distHead > 4) {
+                isSafe = true;
+            }
+        }
+        return pos;
+    }
+
+    // --- LOGIKA GAME ---
+    function startGame() {
+        document.getElementById('start-screen').classList.add('hidden');
+        document.getElementById('game-over-screen').classList.add('hidden');
+        
+        snake = [{ x: 10, y: 10 }, { x: 9, y: 10 }, { x: 8, y: 10 }];
+        velocity = { x: 1, y: 0 }; // Gerak ke kanan awal
+        score = 0;
+        speed = 150;
+        updateScore();
+        
+        isGameRunning = true;
+        generateQuestion();
+        
+        if (gameLoop) clearInterval(gameLoop);
+        gameLoop = setInterval(update, speed);
+    }
+
+    function update() {
+        if (!isGameRunning) return;
+
+        // Gerakkan Ular
+        const head = { x: snake[0].x + velocity.x, y: snake[0].y + velocity.y };
+
+        // Cek Tabrakan Dinding (Tembus atau Mati? Kita buat mati jika nabrak tembok untuk tantangan)
+        if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
+            gameOver();
+            return;
+        }
+
+        // Cek Tabrakan Diri Sendiri
+        for (let i = 0; i < snake.length; i++) {
+            if (head.x === snake[i].x && head.y === snake[i].y) {
+                gameOver();
+                return;
+            }
+        }
+
+        snake.unshift(head); // Tambah kepala baru
+
+        // Cek Makan
+        let ateFood = false;
+        let ateCorrect = false;
+        let eatenIndex = -1;
+
+        for (let i = 0; i < foodItems.length; i++) {
+            if (head.x === foodItems[i].x && head.y === foodItems[i].y) {
+                ateFood = true;
+                eatenIndex = i;
+                if (foodItems[i].isCorrect) {
+                    ateCorrect = true;
+                }
+                break;
+            }
+        }
+
+        if (ateFood) {
+            if (ateCorrect) {
+                // Jawaban Benar
+                score += 10;
+                // Percepat sedikit setiap kelipatan 50 poin
+                if(score % 50 === 0 && speed > 80) {
+                    speed -= 10;
+                    clearInterval(gameLoop);
+                    gameLoop = setInterval(update, speed);
+                }
+                updateScore();
+                
+                // Efek visual kotak soal
+                const qBox = document.getElementById('question-box');
+                qBox.classList.remove('bg-blue-600');
+                qBox.classList.add('bg-green-500', 'scale-110');
+                setTimeout(() => {
+                    qBox.classList.remove('bg-green-500', 'scale-110');
+                    qBox.classList.add('bg-blue-600');
+                }, 300);
+
+                generateQuestion(); // Soal baru
+                // Jangan pop (ular bertambah panjang)
+            } else {
+                // Jawaban Salah
+                score = Math.max(0, score - 5);
+                updateScore();
+                
+                // Potong ular
+                snake.pop(); // Pop normal
+                snake.pop(); // Hukuman extra (memendek)
+                if (snake.length === 0) {
+                    gameOver();
+                    return;
+                }
+                
+                // Visual Salah
+                const qBox = document.getElementById('question-box');
+                qBox.classList.remove('bg-blue-600');
+                qBox.classList.add('bg-red-500');
+                setTimeout(() => qBox.classList.remove('bg-red-500', 'bg-blue-600'), 300);
+                setTimeout(() => qBox.classList.add('bg-blue-600'), 300);
+
+                // Hilangkan makanan yang dimakan
+                foodItems.splice(eatenIndex, 1);
+            }
+        } else {
+            snake.pop(); // Hapus ekor jika tidak makan (gerak normal)
+        }
+
+        draw();
+    }
+
+    function draw() {
+        // Bersihkan Canvas
+        ctx.fillStyle = '#2d3748';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Gambar Grid (Opsional, tipis)
+        ctx.strokeStyle = '#37455c'; // Sedikit lebih terang dari bg
+        ctx.lineWidth = 0.5;
+        /*
+        for(let i=0; i<tileCount; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i*gridSize, 0);
+            ctx.lineTo(i*gridSize, canvas.height);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(0, i*gridSize);
+            ctx.lineTo(canvas.width, i*gridSize);
+            ctx.stroke();
+        }
+        */
+
+        // Gambar Makanan (Angka)
+        ctx.font = 'bold 14px Fredoka';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        foodItems.forEach(food => {
+            // Lingkaran latar belakang angka
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(
+                food.x * gridSize + gridSize/2, 
+                food.y * gridSize + gridSize/2, 
+                gridSize/2 - 2, 0, Math.PI*2
+            );
+            ctx.fill();
+
+            // Angka
+            ctx.fillStyle = 'white';
+            ctx.fillText(
+                food.value, 
+                food.x * gridSize + gridSize/2, 
+                food.y * gridSize + gridSize/2 + 1
+            );
+        });
+
+        // Gambar Ular
+        snake.forEach((part, index) => {
+            // Kepala beda warna dikit
+            ctx.fillStyle = index === 0 ? '#68d391' : '#48bb78'; 
+            
+            // Membuat ular sedikit melengkung (rounded rect)
+            let x = part.x * gridSize;
+            let y = part.y * gridSize;
+            let size = gridSize - 2;
+            
+            ctx.fillRect(x + 1, y + 1, size, size);
+            
+            // Mata Ular (Hanya di kepala)
+            if (index === 0) {
+                ctx.fillStyle = 'black';
+                let eyeSize = 3;
+                let eyeOffset = 5;
+                
+                // Posisi mata tergantung arah
+                if (velocity.x === 1) { // Kanan
+                    ctx.fillRect(x + size - eyeOffset, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + size - eyeOffset, y + size - 5, eyeSize, eyeSize);
+                } else if (velocity.x === -1) { // Kiri
+                    ctx.fillRect(x + eyeOffset, y + 5, eyeSize, eyeSize);
+                    ctx.fillRect(x + eyeOffset, y + size - 5, eyeSize, eyeSize);
+                } else if (velocity.y === -1) { // Atas
+                    ctx.fillRect(x + 5, y + eyeOffset, eyeSize, eyeSize);
+                    ctx.fillRect(x + size - 5, y + eyeOffset, eyeSize, eyeSize);
+                } else if (velocity.y === 1) { // Bawah
+                    ctx.fillRect(x + 5, y + size - eyeOffset, eyeSize, eyeSize);
+                    ctx.fillRect(x + size - 5, y + size - eyeOffset, eyeSize, eyeSize);
+                }
+            }
+        });
+    }
+
+    function gameOver() {
+        isGameRunning = false;
+        clearInterval(gameLoop);
+        
+        if (score > highScore) {
+            highScore = score;
+            localStorage.setItem('mathSnakeHighScore', highScore);
+            document.getElementById('high-score').innerText = highScore;
+        }
+        
+        document.getElementById('final-score').innerText = score;
+        document.getElementById('game-over-screen').classList.remove('hidden');
+    }
+
+    function updateScore() {
+        document.getElementById('score-display').innerText = score;
+    }
+
+    // --- KONTROL INPUT ---
+    
+    // Keyboard (Laptop)
+    document.addEventListener('keydown', keyPush);
+    function keyPush(evt) {
+        if (!isGameRunning) return;
+        
+        // Mencegah scroll window dengan panah
+        if([37, 38, 39, 40].indexOf(evt.keyCode) > -1) {
+            evt.preventDefault();
+        }
+
+        switch(evt.keyCode) {
+            case 37: // Left
+                if(velocity.x !== 1) velocity = { x: -1, y: 0 };
+                break;
+            case 38: // Up
+                if(velocity.y !== 1) velocity = { x: 0, y: -1 };
+                break;
+            case 39: // Right
+                if(velocity.x !== -1) velocity = { x: 1, y: 0 };
+                break;
+            case 40: // Down
+                if(velocity.y !== -1) velocity = { x: 0, y: 1 };
+                break;
+        }
+    }
+
+    // Touch Controls (HP)
+    function handleMobileInput(direction, event) {
+        if(event) event.preventDefault(); // Stop double tap zoom etc
+        if (!isGameRunning) return;
+
+        switch(direction) {
+            case 'left':
+                if(velocity.x !== 1) velocity = { x: -1, y: 0 };
+                break;
+            case 'up':
+                if(velocity.y !== 1) velocity = { x: 0, y: -1 };
+                break;
+            case 'right':
+                if(velocity.x !== -1) velocity = { x: 1, y: 0 };
+                break;
+            case 'down':
+                if(velocity.y !== -1) velocity = { x: 0, y: 1 };
+                break;
+        }
+    }
+
+    // Swipe Support (Opsional, untuk kenyamanan extra di HP)
+    let touchStartX = 0;
+    let touchStartY = 0;
+    const canvasEl = document.getElementById('game-wrapper');
+
+    canvasEl.addEventListener('touchstart', function(evt) {
+        touchStartX = evt.changedTouches[0].screenX;
+        touchStartY = evt.changedTouches[0].screenY;
+    }, false);
+
+    canvasEl.addEventListener('touchend', function(evt) {
+        if(!isGameRunning) return;
+        let touchEndX = evt.changedTouches[0].screenX;
+        let touchEndY = evt.changedTouches[0].screenY;
+        handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+    }, false);
+
+    function handleSwipe(startX, startY, endX, endY) {
+        let diffX = endX - startX;
+        let diffY = endY - startY;
+
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            // Horizontal Swipe
+            if (diffX > 0) handleMobileInput('right');
+            else handleMobileInput('left');
+        } else {
+            // Vertical Swipe
+            if (diffY > 0) handleMobileInput('down');
+            else handleMobileInput('up');
+        }
+    }
+
+</script>
+</body>
+</html>
