@@ -31,6 +31,9 @@
             background-image: radial-gradient(#4a5568 1px, transparent 1px);
             background-size: 20px 20px;
         }
+        input::placeholder {
+            color: #a0aec0;
+        }
     </style>
 </head>
 <body class="h-screen w-full flex flex-col items-center justify-center bg-gray-900">
@@ -39,11 +42,11 @@
     <div class="w-full max-w-md px-4 mb-2 flex justify-between items-center">
         <div>
             <h1 class="text-xl text-green-400 font-bold">Math Snake 🐍</h1>
-            <p class="text-xs text-gray-400">Makan jawaban yang benar!</p>
+            <p class="text-xs text-gray-400">Pemain: <span id="playerNameDisplay" class="text-white">-</span></p>
         </div>
         <div class="text-right">
             <div class="text-2xl font-bold text-yellow-400" id="scoreDisplay">0</div>
-            <div class="text-xs text-gray-400">Skor Tertinggi: <span id="highScoreDisplay">0</span></div>
+            <div class="text-xs text-gray-400">Tertinggi: <span id="highScoreDisplay">0</span></div>
         </div>
     </div>
 
@@ -51,7 +54,7 @@
     <div class="w-full max-w-md px-4 mb-4 text-center">
         <div class="bg-indigo-600 rounded-lg py-2 px-4 shadow-lg border-2 border-indigo-400">
             <span class="text-sm text-indigo-200 block uppercase tracking-wider">Soal</span>
-            <span id="questionDisplay" class="text-3xl font-bold text-white">Tekan Mulai</span>
+            <span id="questionDisplay" class="text-3xl font-bold text-white">Siap?</span>
         </div>
     </div>
 
@@ -60,12 +63,22 @@
         <canvas id="gameCanvas" width="400" height="400" class="border-4 border-gray-700 grid-bg max-w-[95vw] max-h-[50vh]"></canvas>
         
         <!-- Overlay Start / Game Over -->
-        <div id="overlay" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center rounded-lg z-10">
+        <div id="overlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded-lg z-20 p-6 text-center">
             <h2 id="overlayTitle" class="text-4xl font-bold text-green-500 mb-2">Math Snake</h2>
-            <p id="overlayMessage" class="text-gray-300 mb-6 text-center px-4">Gunakan panah atau tombol untuk mengarahkan ular.</p>
-            <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105">
+            
+            <!-- Input Nama -->
+            <div id="inputContainer" class="w-full max-w-xs mb-4">
+                <label class="block text-gray-400 text-sm mb-1 text-left">Masukkan Nama Kamu:</label>
+                <input type="text" id="playerNameInput" class="w-full px-4 py-2 rounded bg-gray-800 border border-gray-600 text-white focus:outline-none focus:border-green-500 placeholder-gray-500" placeholder="Contoh: Budi">
+            </div>
+
+            <p id="overlayMessage" class="text-gray-300 mb-4 text-sm">Jawab soal matematika untuk memanjangkan ular!</p>
+            
+            <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 w-full max-w-xs">
                 Mulai Main
             </button>
+            
+            <p id="saveStatus" class="mt-4 text-xs text-yellow-400 hidden">Menyimpan skor...</p>
         </div>
     </div>
 
@@ -80,64 +93,83 @@
     </div>
 
     <script>
+        // --- KONFIGURASI GOOGLE SHEETS ---
+        // Ganti URL di bawah ini dengan URL Web App Google Script Anda
+        // Lihat tutorial di bagian paling bawah kode ini untuk cara membuatnya.
+        const GOOGLE_SCRIPT_URL = ''; 
+
         // --- Konfigurasi Game ---
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const gridSize = 20; // Ukuran setiap kotak grid
-        let tileCount = 20; // Jumlah kotak per baris/kolom (akan disesuaikan saat resize)
+        const gridSize = 20; 
+        let tileCount = 20; 
         
         // --- State Game ---
         let score = 0;
         let highScore = localStorage.getItem('mathSnakeHighScore') || 0;
         let gameRunning = false;
-        let speed = 150; // Kecepatan awal (ms)
+        
+        // Kecepatan
+        let initialSpeed = 250; // Lebih lambat diawal (ms)
+        let currentSpeed = initialSpeed;
         let gameLoop;
+        
+        let playerName = "";
         
         // Posisi Ular & Arah
         let snake = [];
         let dx = 0;
         let dy = 0;
         
-        // Logika Matematika & Makanan
+        // Logika Matematika
         let currentQuestion = {};
-        let foods = []; // Array object {x, y, value, isCorrect}
+        let foods = []; 
 
         // --- Inisialisasi Tampilan ---
         document.getElementById('highScoreDisplay').innerText = highScore;
 
-        // Fungsi Resize untuk Responsif
+        // Fungsi Resize
         function resizeCanvas() {
-            // Kita ingin canvas kotak sempurna, maksimal lebar layar HP
             let size = Math.min(window.innerWidth - 30, 400); 
-            // Pastikan kelipatan gridSize
             size = Math.floor(size / gridSize) * gridSize;
-            
             canvas.width = size;
             canvas.height = size;
             tileCount = size / gridSize;
         }
-        
         window.addEventListener('resize', resizeCanvas);
         resizeCanvas();
 
         // --- Logika Inti Game ---
 
         function startGame() {
+            const nameInput = document.getElementById('playerNameInput');
+            if (nameInput.value.trim() === "") {
+                alert("Mohon masukkan nama terlebih dahulu!");
+                nameInput.focus();
+                return;
+            }
+            playerName = nameInput.value.trim();
+            document.getElementById('playerNameDisplay').innerText = playerName;
+
             if (gameRunning) return;
             
             // Reset Variabel
-            snake = [{x: 10, y: 10}, {x: 10, y: 11}, {x: 10, y: 12}]; // Kepala di index 0
+            snake = [{x: 10, y: 10}, {x: 10, y: 11}, {x: 10, y: 12}];
             dx = 0;
-            dy = -1; // Gerak ke atas
+            dy = -1; 
             score = 0;
-            speed = 150;
+            currentSpeed = initialSpeed; // Reset kecepatan
             
             updateScoreUI();
+            
+            // UI Update
             document.getElementById('overlay').classList.add('hidden');
+            document.getElementById('saveStatus').classList.add('hidden');
+            document.getElementById('inputContainer').classList.add('hidden'); // Sembunyikan input saat restart
             
             generateQuestionAndFood();
             gameRunning = true;
-            gameLoop = setTimeout(runGameCycle, speed);
+            gameLoop = setTimeout(runGameCycle, currentSpeed);
         }
 
         function runGameCycle() {
@@ -148,19 +180,20 @@
             draw();
 
             if (gameRunning) {
-                // Sedikit percepatan setiap kelipatan skor 5
-                let currentSpeed = Math.max(80, 150 - (Math.floor(score / 5) * 5));
-                gameLoop = setTimeout(runGameCycle, currentSpeed);
+                // Logika Kecepatan: Semakin tinggi skor, delay makin kecil (makin cepat)
+                // Kecepatan max (paling cepat) adalah 80ms
+                // Setiap 1 poin, kecepatan bertambah (waktu berkurang 5ms)
+                let newSpeed = Math.max(80, initialSpeed - (score * 5));
+                
+                gameLoop = setTimeout(runGameCycle, newSpeed);
             }
         }
 
         function generateQuestionAndFood() {
-            // 1. Buat Soal Matematika
             const ops = ['+', '-', '*'];
             const op = ops[Math.floor(Math.random() * ops.length)];
             let a, b, ans;
 
-            // Buat angka agar hasilnya masuk akal (0-99)
             if (op === '+') {
                 a = Math.floor(Math.random() * 20);
                 b = Math.floor(Math.random() * 20);
@@ -169,7 +202,7 @@
                 a = Math.floor(Math.random() * 20) + 10;
                 b = Math.floor(Math.random() * 10);
                 ans = a - b;
-            } else { // Perkalian
+            } else { 
                 a = Math.floor(Math.random() * 9) + 1;
                 b = Math.floor(Math.random() * 9) + 1;
                 ans = a * b;
@@ -178,20 +211,15 @@
             currentQuestion = { text: `${a} ${op} ${b} = ?`, answer: ans };
             document.getElementById('questionDisplay').innerText = currentQuestion.text;
 
-            // 2. Buat Opsi Jawaban (Makanan)
             foods = [];
-            
-            // Buat 1 jawaban benar
             let correctFood = spawnFoodItem(ans, true);
             foods.push(correctFood);
 
-            // Buat 2 jawaban salah (pengecoh)
             for (let i = 0; i < 2; i++) {
                 let wrongAns;
                 do {
                     wrongAns = ans + Math.floor(Math.random() * 10) - 5;
                 } while (wrongAns === ans || wrongAns < 0 || foods.some(f => f.value === wrongAns));
-                
                 foods.push(spawnFoodItem(wrongAns, false));
             }
         }
@@ -205,8 +233,6 @@
                     value: value,
                     isCorrect: isCorrect
                 };
-                
-                // Cek agar tidak muncul di tubuh ular atau menumpuk makanan lain
                 let collision = false;
                 for (let part of snake) {
                     if (part.x === item.x && part.y === item.y) collision = true;
@@ -214,7 +240,6 @@
                 for (let f of foods) {
                     if (f.x === item.x && f.y === item.y) collision = true;
                 }
-                
                 if (!collision) break;
             }
             return item;
@@ -222,9 +247,8 @@
 
         function advanceSnake() {
             const head = { x: snake[0].x + dx, y: snake[0].y + dy };
-            snake.unshift(head); // Tambah kepala baru
+            snake.unshift(head); 
 
-            // Cek apakah makan
             let ateIndex = -1;
             for (let i = 0; i < foods.length; i++) {
                 if (head.x === foods[i].x && head.y === foods[i].y) {
@@ -236,31 +260,23 @@
             if (ateIndex !== -1) {
                 const eatenFood = foods[ateIndex];
                 if (eatenFood.isCorrect) {
-                    // Benar!
                     score++;
                     updateScoreUI();
                     generateQuestionAndFood();
-                    // Jangan pop ekor (ular memanjang)
                 } else {
-                    // Salah Makan!
                     gameOver("Salah Makan! Jawabannya " + currentQuestion.answer);
                 }
             } else {
-                // Tidak makan, buang ekor lama
                 snake.pop();
             }
         }
 
         function checkCollisions() {
             const head = snake[0];
-
-            // Tabrak Dinding
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 gameOver("Menabrak Dinding!");
                 return;
             }
-
-            // Tabrak Diri Sendiri
             for (let i = 1; i < snake.length; i++) {
                 if (head.x === snake[i].x && head.y === snake[i].y) {
                     gameOver("Menabrak Ekor Sendiri!");
@@ -281,65 +297,90 @@
 
             document.getElementById('overlayTitle').innerText = "Game Over!";
             document.getElementById('overlayMessage').innerHTML = `<span class="text-red-400 font-bold">${reason}</span><br>Skor Akhir: ${score}`;
+            
+            // Tampilkan Overlay lagi
             document.getElementById('overlay').classList.remove('hidden');
+            document.getElementById('inputContainer').classList.add('hidden'); // Sembunyikan input nama (sudah ada)
             document.getElementById('questionDisplay').innerText = "Selesai";
+
+            // Simpan ke Google Sheets
+            saveToGoogleSheets(playerName, score);
         }
 
         function updateScoreUI() {
             document.getElementById('scoreDisplay').innerText = score;
         }
 
+        // --- Simpan ke Google Sheets ---
+        function saveToGoogleSheets(name, score) {
+            if (!GOOGLE_SCRIPT_URL) {
+                console.log("URL Google Script belum diatur. Data tidak disimpan.");
+                return;
+            }
+
+            const statusEl = document.getElementById('saveStatus');
+            statusEl.innerText = "Menyimpan skor ke Google Sheets...";
+            statusEl.classList.remove('hidden');
+            statusEl.className = "mt-4 text-xs text-yellow-400 block";
+
+            // Kirim data menggunakan FormData
+            const formData = new FormData();
+            formData.append('nama', name);
+            formData.append('skor', score);
+
+            fetch(GOOGLE_SCRIPT_URL, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                statusEl.innerText = "Skor berhasil disimpan!";
+                statusEl.className = "mt-4 text-xs text-green-400 block";
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                statusEl.innerText = "Gagal menyimpan skor (Cek Koneksi).";
+                statusEl.className = "mt-4 text-xs text-red-400 block";
+            });
+        }
+
         // --- Rendering (Canvas Drawing) ---
         function draw() {
-            // Bersihkan Canvas
-            ctx.fillStyle = '#2d3748'; // Warna Background
+            ctx.fillStyle = '#2d3748';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Gambar Makanan (Angka)
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.font = 'bold 14px Fredoka';
 
             for (let f of foods) {
-                // Lingkaran Makanan
-                ctx.fillStyle = f.isCorrect ? '#f6e05e' : '#f6e05e'; // Samarkan warnanya agar tidak curang, atau bedakan sedikit utk style
-                // Biar fair, semua makanan warnanya sama (kuning), pemain harus baca angkanya
-                
+                ctx.fillStyle = '#f6e05e'; 
                 ctx.beginPath();
                 ctx.arc(f.x * gridSize + gridSize/2, f.y * gridSize + gridSize/2, gridSize/2 - 2, 0, Math.PI * 2);
                 ctx.fill();
 
-                // Angka di dalam makanan
                 ctx.fillStyle = '#1a202c';
                 ctx.fillText(f.value, f.x * gridSize + gridSize/2, f.y * gridSize + gridSize/2 + 1);
             }
 
-            // Gambar Ular
             for (let i = 0; i < snake.length; i++) {
-                // Warna Kepala vs Badan
                 ctx.fillStyle = (i === 0) ? '#48bb78' : '#38a169'; 
-                
-                // Efek rounded pada segmen ular
                 let x = snake[i].x * gridSize;
                 let y = snake[i].y * gridSize;
-                
                 ctx.fillRect(x + 1, y + 1, gridSize - 2, gridSize - 2);
                 
-                // Mata Ular (Hanya di kepala)
                 if (i === 0) {
                     ctx.fillStyle = 'white';
-                    // Logika posisi mata sederhana
                     let eyeSize = 3;
-                    if (dx === 1) { // Kanan
+                    if (dx === 1) { 
                          ctx.fillRect(x + 12, y + 4, eyeSize, eyeSize);
                          ctx.fillRect(x + 12, y + 12, eyeSize, eyeSize);
-                    } else if (dx === -1) { // Kiri
+                    } else if (dx === -1) { 
                          ctx.fillRect(x + 4, y + 4, eyeSize, eyeSize);
                          ctx.fillRect(x + 4, y + 12, eyeSize, eyeSize);
-                    } else if (dy === -1) { // Atas
+                    } else if (dy === -1) { 
                          ctx.fillRect(x + 4, y + 4, eyeSize, eyeSize);
                          ctx.fillRect(x + 12, y + 4, eyeSize, eyeSize);
-                    } else { // Bawah
+                    } else { 
                          ctx.fillRect(x + 4, y + 12, eyeSize, eyeSize);
                          ctx.fillRect(x + 12, y + 12, eyeSize, eyeSize);
                     }
@@ -348,43 +389,81 @@
         }
 
         // --- Kontrol Input ---
-
         function changeDirection(newDir) {
             if (!gameRunning) return;
-            
-            // Cegah balik arah langsung (misal: lagi ke atas, gak bisa langsung ke bawah)
             const goingUp = dy === -1;
             const goingDown = dy === 1;
             const goingRight = dx === 1;
             const goingLeft = dx === -1;
 
-            if (newDir === 'LEFT' && !goingRight) {
-                dx = -1; dy = 0;
-            }
-            if (newDir === 'UP' && !goingDown) {
-                dx = 0; dy = -1;
-            }
-            if (newDir === 'RIGHT' && !goingLeft) {
-                dx = 1; dy = 0;
-            }
-            if (newDir === 'DOWN' && !goingUp) {
-                dx = 0; dy = 1;
-            }
+            if (newDir === 'LEFT' && !goingRight) { dx = -1; dy = 0; }
+            if (newDir === 'UP' && !goingDown) { dx = 0; dy = -1; }
+            if (newDir === 'RIGHT' && !goingLeft) { dx = 1; dy = 0; }
+            if (newDir === 'DOWN' && !goingUp) { dx = 0; dy = 1; }
         }
 
-        // Keyboard Listener (Laptop)
         document.addEventListener('keydown', (event) => {
-            // Cegah scrolling dengan panah saat main
             if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].indexOf(event.code) > -1) {
                 event.preventDefault();
             }
-
             if (event.key === 'ArrowLeft') changeDirection('LEFT');
             if (event.key === 'ArrowUp') changeDirection('UP');
             if (event.key === 'ArrowRight') changeDirection('RIGHT');
             if (event.key === 'ArrowDown') changeDirection('DOWN');
         });
 
+/*
+--- PANDUAN INTEGRASI GOOGLE SHEETS ---
+
+Agar skor bisa tersimpan, ikuti langkah ini:
+
+1. Buka Google Sheets baru di https://sheets.google.com/
+2. Beri nama Sheet, lalu di baris pertama (Header), isi sel A1 dengan "Waktu", B1 dengan "Nama", C1 dengan "Skor".
+3. Klik menu "Ekstensi" (Extensions) > "Apps Script".
+4. Hapus kode yang ada, dan paste kode berikut:
+
+   var SHEET_NAME = "Sheet1";
+   var SCRIPT_PROP = PropertiesService.getScriptProperties();
+
+   function doPost(e) {
+     var lock = LockService.getScriptLock();
+     lock.tryLock(10000);
+
+     try {
+       var doc = SpreadsheetApp.getActiveSpreadsheet();
+       var sheet = doc.getSheetByName(SHEET_NAME);
+
+       var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+       var nextRow = sheet.getLastRow() + 1;
+
+       var newRow = headers.map(function(header) {
+         if(header === 'Waktu'){ return new Date(); }
+         if(header === 'Nama'){ return e.parameter.nama; }
+         if(header === 'Skor'){ return e.parameter.skor; }
+       });
+
+       sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
+
+       return ContentService.createTextOutput("Sukses").setMimeType(ContentService.MimeType.TEXT);
+     } catch (e) {
+       return ContentService.createTextOutput("Error").setMimeType(ContentService.MimeType.TEXT);
+     } finally {
+       lock.releaseLock();
+     }
+   }
+
+5. Simpan Project (Ctrl+S).
+6. Klik tombol "Terapkan" (Deploy) di pojok kanan atas > "Deployment Baru" (New Deployment).
+7. Pilih jenis: "Aplikasi Web" (Web App).
+8. Isi Deskripsi (bebas).
+9. "Jalankan sebagai": "Saya" (Me).
+10. "Yang memiliki akses": "Siapa saja" (Anyone) -> PENTING!
+11. Klik "Terapkan" (Deploy). Berikan izin akses jika diminta.
+12. Salin "URL Aplikasi Web" (Web App URL) yang muncul.
+13. Kembali ke kode game ini, cari variabel `const GOOGLE_SCRIPT_URL = '';` di bagian atas script, dan paste URL tersebut di dalam tanda kutip.
+
+Selesai! Sekarang skor akan otomatis masuk ke Google Sheets.
+*/
     </script>
 </body>
 </html>
