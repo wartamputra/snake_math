@@ -18,6 +18,7 @@
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             background-color: #2d3748;
             border-radius: 8px;
+            margin: 0 auto; /* Tengah secara horizontal */
         }
         .game-btn {
             transition: transform 0.1s;
@@ -39,6 +40,7 @@
 <body class="h-screen w-full flex flex-col items-center justify-center bg-gray-900">
 
     <!-- Header & Skor -->
+    <!-- Menggunakan w-full max-w-md px-4 agar konsisten -->
     <div class="w-full max-w-md px-4 mb-2 flex justify-between items-center">
         <div>
             <h1 class="text-xl text-green-400 font-bold">Math Snake 🐍</h1>
@@ -51,34 +53,41 @@
     </div>
 
     <!-- Area Pertanyaan -->
+    <!-- Menggunakan w-full max-w-md px-4 agar konsisten -->
     <div class="w-full max-w-md px-4 mb-4 text-center">
-        <div class="bg-indigo-600 rounded-lg py-2 px-4 shadow-lg border-2 border-indigo-400">
+        <div class="bg-indigo-600 rounded-lg py-2 px-4 shadow-lg border-2 border-indigo-400 w-full">
             <span class="text-sm text-indigo-200 block uppercase tracking-wider">Soal</span>
             <span id="questionDisplay" class="text-3xl font-bold text-white">Siap?</span>
         </div>
     </div>
 
     <!-- Container Game -->
-    <div class="relative group">
-        <canvas id="gameCanvas" width="400" height="400" class="border-4 border-gray-700 grid-bg max-w-[95vw] max-h-[50vh]"></canvas>
-        
-        <!-- Overlay Start / Game Over -->
-        <div id="overlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded-lg z-20 p-6 text-center">
-            <h2 id="overlayTitle" class="text-4xl font-bold text-green-500 mb-2">Math Snake</h2>
+    <!-- DIBUAT SAMA: w-full max-w-md px-4 -->
+    <div id="gameContainerWrapper" class="w-full max-w-md px-4 relative group flex justify-center">
+        <div class="relative w-full">
+            <canvas id="gameCanvas" class="border-4 border-gray-700 grid-bg block w-full"></canvas>
             
-            <!-- Input Nama -->
-            <div id="inputContainer" class="w-full max-w-xs mb-4">
-                <label class="block text-gray-400 text-sm mb-1 text-left">Masukkan Nama Kamu:</label>
-                <input type="text" id="playerNameInput" class="w-full px-4 py-2 rounded bg-gray-800 border border-gray-600 text-white focus:outline-none focus:border-green-500 placeholder-gray-500" placeholder="Contoh: Budi">
-            </div>
+            <!-- Overlay Start / Game Over -->
+            <div id="overlay" class="absolute inset-0 bg-black/90 flex flex-col items-center justify-center rounded-lg z-20 p-6 text-center overflow-y-auto">
+                <h2 id="overlayTitle" class="text-4xl font-bold text-green-500 mb-2">Math Snake</h2>
+                
+                <!-- Input Nama & Sekolah -->
+                <div id="inputContainer" class="w-full max-w-xs mb-4">
+                    <label class="block text-gray-400 text-sm mb-1 text-left">Nama Lengkap:</label>
+                    <input type="text" id="playerNameInput" class="w-full px-4 py-2 mb-2 rounded bg-gray-800 border border-gray-600 text-white focus:outline-none focus:border-green-500 placeholder-gray-500" placeholder="Contoh: Budi Santoso">
+                    
+                    <label class="block text-gray-400 text-sm mb-1 text-left">Asal Sekolah:</label>
+                    <input type="text" id="playerSchoolInput" class="w-full px-4 py-2 rounded bg-gray-800 border border-gray-600 text-white focus:outline-none focus:border-green-500 placeholder-gray-500" placeholder="Contoh: SDN 1 Jakarta">
+                </div>
 
-            <p id="overlayMessage" class="text-gray-300 mb-4 text-sm">Jawab soal matematika untuk memanjangkan ular!</p>
-            
-            <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 w-full max-w-xs">
-                Mulai Main
-            </button>
-            
-            <p id="saveStatus" class="mt-4 text-xs text-yellow-400 hidden">Menyimpan skor...</p>
+                <p id="overlayMessage" class="text-gray-300 mb-4 text-sm">Jawab soal matematika untuk memanjangkan ular!</p>
+                
+                <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 w-full max-w-xs">
+                    Mulai Main
+                </button>
+                
+                <p id="saveStatus" class="mt-4 text-xs text-yellow-400 hidden">Menyimpan skor...</p>
+            </div>
         </div>
     </div>
 
@@ -93,10 +102,12 @@
     </div>
 
     <script>
-        // --- KONFIGURASI GOOGLE SHEETS ---
-        // Ganti URL di bawah ini dengan URL Web App Google Script Anda
-        // Lihat tutorial di bagian paling bawah kode ini untuk cara membuatnya.
-        const GOOGLE_SCRIPT_URL = ''; 
+        // =================================================================
+        // PENGATURAN GOOGLE SHEETS
+        // Masukkan URL Web App Google Script Anda di antara tanda kutip di bawah ini
+        // =================================================================
+        const GOOGLE_SCRIPT_URL = ''; // <-- ISI URL DI SINI
+        // =================================================================
 
         // --- Konfigurasi Game ---
         const canvas = document.getElementById('gameCanvas');
@@ -110,11 +121,12 @@
         let gameRunning = false;
         
         // Kecepatan
-        let initialSpeed = 250; // Lebih lambat diawal (ms)
+        let initialSpeed = 250; 
         let currentSpeed = initialSpeed;
         let gameLoop;
         
         let playerName = "";
+        let playerSchool = "";
         
         // Posisi Ular & Arah
         let snake = [];
@@ -128,44 +140,66 @@
         // --- Inisialisasi Tampilan ---
         document.getElementById('highScoreDisplay').innerText = highScore;
 
-        // Fungsi Resize
+        // Fungsi Resize untuk menyamakan lebar dengan kotak soal
         function resizeCanvas() {
-            let size = Math.min(window.innerWidth - 30, 400); 
-            size = Math.floor(size / gridSize) * gridSize;
+            // Kita ambil lebar dari wrapper pembungkus agar sinkron dengan kotak soal
+            const wrapper = document.getElementById('gameContainerWrapper');
+            // Ambil lebar klien dikurangi padding (32px = 16px kiri + 16px kanan dari px-4)
+            let targetWidth = wrapper.clientWidth - 32;
+
+            // Pastikan lebar adalah kelipatan gridSize agar kotak-kotak pas
+            let size = Math.floor(targetWidth / gridSize) * gridSize;
+            
+            // Set ukuran canvas (kotak sempurna)
             canvas.width = size;
             canvas.height = size;
             tileCount = size / gridSize;
         }
+        
+        // Panggil resize saat load dan saat layar berubah ukuran
         window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
+        // Panggil sedikit delay agar layout render dulu
+        setTimeout(resizeCanvas, 10);
 
         // --- Logika Inti Game ---
 
         function startGame() {
             const nameInput = document.getElementById('playerNameInput');
-            if (nameInput.value.trim() === "") {
-                alert("Mohon masukkan nama terlebih dahulu!");
-                nameInput.focus();
+            const schoolInput = document.getElementById('playerSchoolInput');
+
+            if (nameInput.value.trim() === "" || schoolInput.value.trim() === "") {
+                alert("Mohon lengkapi Nama dan Asal Sekolah!");
+                if (nameInput.value.trim() === "") nameInput.focus();
+                else schoolInput.focus();
                 return;
             }
+            
             playerName = nameInput.value.trim();
-            document.getElementById('playerNameDisplay').innerText = playerName;
+            playerSchool = schoolInput.value.trim();
+            
+            // Update display nama (bisa dipotong jika terlalu panjang)
+            document.getElementById('playerNameDisplay').innerText = playerName.length > 10 ? playerName.substring(0, 10) + "..." : playerName;
 
             if (gameRunning) return;
             
+            // Resize lagi untuk memastikan ukuran pas sebelum mulai
+            resizeCanvas();
+
             // Reset Variabel
-            snake = [{x: 10, y: 10}, {x: 10, y: 11}, {x: 10, y: 12}];
+            // Start di tengah-tengah grid berapapun ukurannya
+            const mid = Math.floor(tileCount / 2);
+            snake = [{x: mid, y: mid}, {x: mid, y: mid+1}, {x: mid, y: mid+2}];
             dx = 0;
             dy = -1; 
             score = 0;
-            currentSpeed = initialSpeed; // Reset kecepatan
+            currentSpeed = initialSpeed; 
             
             updateScoreUI();
             
             // UI Update
             document.getElementById('overlay').classList.add('hidden');
             document.getElementById('saveStatus').classList.add('hidden');
-            document.getElementById('inputContainer').classList.add('hidden'); // Sembunyikan input saat restart
+            document.getElementById('inputContainer').classList.add('hidden');
             
             generateQuestionAndFood();
             gameRunning = true;
@@ -180,11 +214,7 @@
             draw();
 
             if (gameRunning) {
-                // Logika Kecepatan: Semakin tinggi skor, delay makin kecil (makin cepat)
-                // Kecepatan max (paling cepat) adalah 80ms
-                // Setiap 1 poin, kecepatan bertambah (waktu berkurang 5ms)
                 let newSpeed = Math.max(80, initialSpeed - (score * 5));
-                
                 gameLoop = setTimeout(runGameCycle, newSpeed);
             }
         }
@@ -303,8 +333,8 @@
             document.getElementById('inputContainer').classList.add('hidden'); // Sembunyikan input nama (sudah ada)
             document.getElementById('questionDisplay').innerText = "Selesai";
 
-            // Simpan ke Google Sheets
-            saveToGoogleSheets(playerName, score);
+            // Simpan ke Google Sheets dengan Sekolah
+            saveToGoogleSheets(playerName, playerSchool, score);
         }
 
         function updateScoreUI() {
@@ -312,7 +342,7 @@
         }
 
         // --- Simpan ke Google Sheets ---
-        function saveToGoogleSheets(name, score) {
+        function saveToGoogleSheets(name, school, score) {
             if (!GOOGLE_SCRIPT_URL) {
                 console.log("URL Google Script belum diatur. Data tidak disimpan.");
                 return;
@@ -326,6 +356,7 @@
             // Kirim data menggunakan FormData
             const formData = new FormData();
             formData.append('nama', name);
+            formData.append('sekolah', school); // Data Sekolah ditambahkan
             formData.append('skor', score);
 
             fetch(GOOGLE_SCRIPT_URL, {
@@ -413,17 +444,17 @@
         });
 
 /*
---- PANDUAN INTEGRASI GOOGLE SHEETS ---
+--- PANDUAN INTEGRASI GOOGLE SHEETS (DIPERBARUI DENGAN SEKOLAH) ---
 
-Agar skor bisa tersimpan, ikuti langkah ini:
+1. Di Google Sheets, buat header kolom berikut di baris 1:
+   - A1: Waktu
+   - B1: Nama
+   - C1: Sekolah  <-- (KOLOM BARU)
+   - D1: Skor
 
-1. Buka Google Sheets baru di https://sheets.google.com/
-2. Beri nama Sheet, lalu di baris pertama (Header), isi sel A1 dengan "Waktu", B1 dengan "Nama", C1 dengan "Skor".
-3. Klik menu "Ekstensi" (Extensions) > "Apps Script".
-4. Hapus kode yang ada, dan paste kode berikut:
+2. Kode Apps Script yang harus di-update:
 
    var SHEET_NAME = "Sheet1";
-   var SCRIPT_PROP = PropertiesService.getScriptProperties();
 
    function doPost(e) {
      var lock = LockService.getScriptLock();
@@ -439,11 +470,11 @@ Agar skor bisa tersimpan, ikuti langkah ini:
        var newRow = headers.map(function(header) {
          if(header === 'Waktu'){ return new Date(); }
          if(header === 'Nama'){ return e.parameter.nama; }
+         if(header === 'Sekolah'){ return e.parameter.sekolah; } // <-- MENANGKAP DATA SEKOLAH
          if(header === 'Skor'){ return e.parameter.skor; }
        });
 
        sheet.getRange(nextRow, 1, 1, newRow.length).setValues([newRow]);
-
        return ContentService.createTextOutput("Sukses").setMimeType(ContentService.MimeType.TEXT);
      } catch (e) {
        return ContentService.createTextOutput("Error").setMimeType(ContentService.MimeType.TEXT);
@@ -451,18 +482,8 @@ Agar skor bisa tersimpan, ikuti langkah ini:
        lock.releaseLock();
      }
    }
-
-5. Simpan Project (Ctrl+S).
-6. Klik tombol "Terapkan" (Deploy) di pojok kanan atas > "Deployment Baru" (New Deployment).
-7. Pilih jenis: "Aplikasi Web" (Web App).
-8. Isi Deskripsi (bebas).
-9. "Jalankan sebagai": "Saya" (Me).
-10. "Yang memiliki akses": "Siapa saja" (Anyone) -> PENTING!
-11. Klik "Terapkan" (Deploy). Berikan izin akses jika diminta.
-12. Salin "URL Aplikasi Web" (Web App URL) yang muncul.
-13. Kembali ke kode game ini, cari variabel `const GOOGLE_SCRIPT_URL = '';` di bagian atas script, dan paste URL tersebut di dalam tanda kutip.
-
-Selesai! Sekarang skor akan otomatis masuk ke Google Sheets.
+   
+3. Jangan lupa "Deploy" ulang sebagai versi baru (New Deployment) setelah mengubah kode script!
 */
     </script>
 </body>
